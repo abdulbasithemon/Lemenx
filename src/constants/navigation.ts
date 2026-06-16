@@ -11,6 +11,7 @@ import {
   Tags,
   Wallet,
   StickyNote,
+  CheckSquare,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -61,6 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     heading: "Workspace",
     items: [
+      { label: "Tasks & Notes", href: "/tasks", icon: CheckSquare },
       { label: "Notes", href: "/notes", icon: StickyNote },
       { label: "Analytics", href: "/analytics", icon: LineChart },
       { label: "Settings", href: "/settings", icon: Settings },
