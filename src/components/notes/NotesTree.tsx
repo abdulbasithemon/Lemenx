@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BookMarked, ChevronDown, ChevronRight, FilePlus2, FolderPlus, Globe,
-  MoreHorizontal, Pencil, Plus, StickyNote, Trash2,
+  BookMarked, Check as CheckIcon, ChevronDown, ChevronRight, FilePlus2,
+  FolderPlus, Globe, MoreHorizontal, Pencil, Plus, StickyNote, Trash2,
+  X as XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { emitNotesChanged, normalizeTree, onNotesChanged } from "@/lib/notesClient";
@@ -35,18 +36,35 @@ function InlineInput({
   onCancel: () => void;
 }) {
   return (
-    <input
-      autoFocus
-      className="w-full rounded border border-input bg-background px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onCommit();
-        if (e.key === "Escape") onCancel();
-      }}
-      onBlur={onCommit}
-    />
+    <div className="flex w-full items-center gap-1">
+      <input
+        autoFocus
+        className="w-full min-w-0 flex-1 rounded border border-input bg-background px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit();
+          if (e.key === "Escape") onCancel();
+        }}
+        onBlur={onCommit}
+      />
+      {/* onMouseDown so these fire before the input's blur */}
+      <button
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground hover:bg-primary/90"
+        title="Save (Enter)"
+        onMouseDown={(e) => { e.preventDefault(); onCommit(); }}
+      >
+        <CheckIcon className="h-3.5 w-3.5" />
+      </button>
+      <button
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted"
+        title="Cancel (Esc)"
+        onMouseDown={(e) => { e.preventDefault(); onCancel(); }}
+      >
+        <XIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -454,8 +472,8 @@ export function NotesTree() {
             );
           })}
 
-          {/* New category input */}
-          {adding?.kind === "category" && (
+          {/* New category — always visible */}
+          {adding?.kind === "category" ? (
             <div className="mx-2 px-2 py-1">
               <InlineInput
                 value={addTitle}
@@ -465,6 +483,13 @@ export function NotesTree() {
                 onCancel={() => { setAdding(null); setAddTitle(""); }}
               />
             </div>
+          ) : (
+            <button
+              className="mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+              onClick={() => setAdding({ kind: "category" })}
+            >
+              <Plus className="h-3.5 w-3.5" /> New Category
+            </button>
           )}
         </div>
       )}
