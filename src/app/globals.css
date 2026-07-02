@@ -76,6 +76,13 @@
   }
 }
 
+/* Block editor placeholders (contentEditable) */
+.block-placeholder:empty::before,
+.block-placeholder-focus:focus:empty::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none text-muted-foreground/50;
+}
+
 /* Thin, subtle scrollbars for the dashboard chrome */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;

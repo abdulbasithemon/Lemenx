@@ -27,6 +27,9 @@ yarn-error.log*
 # prisma
 /prisma/*.db
 
+# local file-based data store (notes, etc.)
+/data/
+
 # typescript
 *.tsbuildinfo
 

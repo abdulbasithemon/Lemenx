@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { NAV_GROUPS } from "@/constants/navigation";
+import { NotesTree } from "@/components/notes/NotesTree";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -34,6 +35,12 @@ export function Sidebar({ workspaceName = "Workspace" }: SidebarProps) {
       <nav className="scrollbar-thin flex-1 space-y-6 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group, i) => (
           <div key={group.heading ?? i}>
+            {/* Notes tree lives between Debts and Workspace */}
+            {group.heading === "Workspace" && (
+              <div className="mb-6">
+                <NotesTree />
+              </div>
+            )}
             {group.heading && (
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.heading}
