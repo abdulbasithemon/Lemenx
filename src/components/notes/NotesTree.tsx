@@ -8,7 +8,7 @@ import {
   MoreHorizontal, Pencil, Plus, StickyNote, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { emitNotesChanged, onNotesChanged } from "@/lib/notesClient";
+import { emitNotesChanged, normalizeTree, onNotesChanged } from "@/lib/notesClient";
 import type { NotesTreeData } from "@/types/notes";
 
 /**
@@ -104,7 +104,10 @@ export function NotesTree() {
   const [dropHint, setDropHint] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(() => {
-    fetch("/api/notes-app").then((r) => r.json()).then(setData).catch(() => {});
+    fetch("/api/notes-app")
+      .then((r) => r.json())
+      .then((raw) => setData(normalizeTree(raw)))
+      .catch(() => {});
   }, []);
 
   React.useEffect(() => {

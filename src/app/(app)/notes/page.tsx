@@ -6,7 +6,7 @@ import { BookMarked, FilePlus2, Globe, Loader2, StickyNote } from "lucide-react"
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { emitNotesChanged, onNotesChanged } from "@/lib/notesClient";
+import { emitNotesChanged, normalizeTree, onNotesChanged } from "@/lib/notesClient";
 import type { NotesTreeData } from "@/types/notes";
 
 /** All-notes overview: Categories → Sections → Notes, click-through to the editor. */
@@ -15,7 +15,10 @@ export default function NotesIndexPage() {
   const [data, setData] = React.useState<NotesTreeData | null>(null);
 
   const refresh = React.useCallback(() => {
-    fetch("/api/notes-app").then((r) => r.json()).then(setData).catch(() => {});
+    fetch("/api/notes-app")
+      .then((r) => r.json())
+      .then((raw) => setData(normalizeTree(raw)))
+      .catch(() => setData(normalizeTree(null)));
   }, []);
 
   React.useEffect(() => {

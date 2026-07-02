@@ -38,7 +38,7 @@ export default function NoteEditorPage() {
       .then((r) => r.json())
       .then((tree: NotesTreeData) => {
         const map: Record<string, { title: string; icon?: string }> = {};
-        for (const n of tree.notes) map[n.id] = { title: n.title, icon: n.icon };
+        for (const n of tree.notes ?? []) map[n.id] = { title: n.title, icon: n.icon };
         setNoteTitles(map);
       })
       .catch(() => {});
