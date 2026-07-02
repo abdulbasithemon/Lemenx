@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID, randomBytes } from "crypto";
-import type { Block, NoteDoc, NoteDTO, NoteGroup } from "@/types/notes";
+import type { Block, NoteCategory, NoteDoc, NoteDTO, NoteGroup } from "@/types/notes";
 
 /**
  * File-based JSON store for the notes module.
@@ -13,6 +13,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "notes-app.json");
 
 interface NotesDB {
+  categories: NoteCategory[];
   groups: NoteGroup[];
   notes: NoteDoc[];
 }
@@ -22,13 +23,15 @@ export const newShareToken = () => randomBytes(18).toString("base64url");
 
 function seed(): NotesDB {
   const now = new Date().toISOString();
+  const categoryId = uid();
   const groupId = uid();
   const noteId = uid();
   const b = (type: Block["type"], content: string, extra: Partial<Block> = {}): Block => ({
     id: uid(), type, content, indent: 0, ...extra,
   });
   return {
-    groups: [{ id: groupId, title: "My Notes", order: 0, createdAt: now }],
+    categories: [{ id: categoryId, title: "General", order: 0, createdAt: now }],
+    groups: [{ id: groupId, categoryId, title: "My Notes", order: 0, createdAt: now }],
     notes: [
       {
         id: noteId,
@@ -68,6 +71,21 @@ function load(): NotesDB {
         n.blocks = [{ id: uid(), type: "text", content: "", indent: 0 }];
       }
     }
+    // Migrate pre-category data: wrap existing groups in a "General" category.
+    if (!Array.isArray(db.categories) || db.categories.length === 0) {
+      const cat: NoteCategory = {
+        id: uid(), title: "General", order: 0, createdAt: new Date().toISOString(),
+      };
+      db.categories = [cat];
+      for (const g of db.groups) g.categoryId = cat.id;
+      persist(db);
+    }
+    // Orphaned groups (deleted category edge cases) fall back to the first category.
+    for (const g of db.groups) {
+      if (!db.categories.some((c) => c.id === g.categoryId)) {
+        g.categoryId = db.categories[0].id;
+      }
+    }
     return db;
   } catch {
     const db = seed();
@@ -94,6 +112,7 @@ export function toDTO(n: NoteDoc): NoteDTO {
 export function getTree() {
   const db = load();
   return {
+    categories: [...db.categories].sort((a, z) => a.order - z.order),
     groups: [...db.groups].sort((a, z) => a.order - z.order),
     notes: db.notes
       .map(({ id, groupId, title, icon, order, isPublished }) => ({ id, groupId, title, icon, order, isPublished }))
@@ -112,12 +131,55 @@ export function getNoteByToken(token: string): NoteDoc | undefined {
 
 /* ── mutations ───────────────────────────────────────────── */
 
-export function createGroup(title: string): NoteGroup {
+export function createCategory(title: string): NoteCategory {
+  const db = load();
+  const cat: NoteCategory = {
+    id: uid(),
+    title: title.trim() || "Untitled category",
+    order: db.categories.length,
+    createdAt: new Date().toISOString(),
+  };
+  db.categories.push(cat);
+  persist(db);
+  return cat;
+}
+
+export function updateCategory(id: string, patch: Partial<Pick<NoteCategory, "title" | "order">>) {
+  const db = load();
+  const c = db.categories.find((c) => c.id === id);
+  if (!c) return undefined;
+  if (patch.title !== undefined) c.title = patch.title.trim() || c.title;
+  if (patch.order !== undefined) c.order = patch.order;
+  persist(db);
+  return c;
+}
+
+/** Deletes the category plus all of its groups and their notes. */
+export function deleteCategory(id: string) {
+  const db = load();
+  const groupIds = db.groups.filter((g) => g.categoryId === id).map((g) => g.id);
+  db.categories = db.categories.filter((c) => c.id !== id);
+  db.groups = db.groups.filter((g) => g.categoryId !== id);
+  db.notes = db.notes.filter((n) => !groupIds.includes(n.groupId));
+  persist(db);
+}
+
+export function reorderCategories(orderedIds: string[]) {
+  const db = load();
+  orderedIds.forEach((cid, i) => {
+    const c = db.categories.find((c) => c.id === cid);
+    if (c) c.order = i;
+  });
+  persist(db);
+}
+
+export function createGroup(categoryId: string, title: string): NoteGroup {
   const db = load();
   const group: NoteGroup = {
     id: uid(),
-    title: title.trim() || "Untitled group",
-    order: db.groups.length,
+    categoryId,
+    title: title.trim() || "Untitled section",
+    order: db.groups.filter((g) => g.categoryId === categoryId).length,
     createdAt: new Date().toISOString(),
   };
   db.groups.push(group);
@@ -125,12 +187,16 @@ export function createGroup(title: string): NoteGroup {
   return group;
 }
 
-export function updateGroup(id: string, patch: Partial<Pick<NoteGroup, "title" | "order">>) {
+export function updateGroup(
+  id: string,
+  patch: Partial<Pick<NoteGroup, "title" | "order" | "categoryId">>
+) {
   const db = load();
   const g = db.groups.find((g) => g.id === id);
   if (!g) return undefined;
   if (patch.title !== undefined) g.title = patch.title.trim() || g.title;
   if (patch.order !== undefined) g.order = patch.order;
+  if (patch.categoryId !== undefined) g.categoryId = patch.categoryId;
   persist(db);
   return g;
 }
@@ -142,12 +208,15 @@ export function deleteGroup(id: string) {
   persist(db);
 }
 
-export function reorderGroups(orderedIds: string[]) {
+export function reorderGroups(moves: Array<{ id: string; categoryId: string; order: number }>) {
   const db = load();
-  orderedIds.forEach((gid, i) => {
-    const g = db.groups.find((g) => g.id === gid);
-    if (g) g.order = i;
-  });
+  for (const m of moves) {
+    const g = db.groups.find((g) => g.id === m.id);
+    if (g) {
+      g.categoryId = m.categoryId;
+      g.order = m.order;
+    }
+  }
   persist(db);
 }
 

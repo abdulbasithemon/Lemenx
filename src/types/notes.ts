@@ -26,8 +26,18 @@ export interface Block {
   linkedNoteId?: string;  // page block
 }
 
+/** Top level: a subject/area, e.g. "Discrete Mathematics". */
+export interface NoteCategory {
+  id: string;
+  title: string;
+  order: number;
+  createdAt: string;
+}
+
+/** Second level: a section inside a category, e.g. "Class Lecture". */
 export interface NoteGroup {
   id: string;
+  categoryId: string;
   title: string;
   order: number;
   createdAt: string;
@@ -53,6 +63,7 @@ export interface NoteDoc {
 export type NoteDTO = Omit<NoteDoc, "passwordHash"> & { hasPassword: boolean };
 
 export interface NotesTreeData {
+  categories: NoteCategory[];
   groups: NoteGroup[];
   notes: Array<Pick<NoteDTO, "id" | "groupId" | "title" | "icon" | "order" | "isPublished">>;
 }

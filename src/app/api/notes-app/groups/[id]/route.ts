@@ -3,10 +3,14 @@ import { deleteGroup, updateGroup } from "@/lib/notesStore";
 
 export const dynamic = "force-dynamic";
 
-/** PATCH /api/notes-app/groups/:id — rename / set order. */
+/** PATCH /api/notes-app/groups/:id — rename / move / set order. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json().catch(() => ({}));
-  const g = updateGroup(params.id, { title: body.title, order: body.order });
+  const g = updateGroup(params.id, {
+    title: body.title,
+    order: body.order,
+    categoryId: typeof body.categoryId === "string" ? body.categoryId : undefined,
+  });
   if (!g) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(g);
 }
