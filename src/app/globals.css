@@ -76,6 +76,18 @@
   }
 }
 
+/* Inline formatting inside note blocks */
+.note-prose code {
+  @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-rose-600 dark:text-rose-400;
+}
+.note-prose a {
+  @apply text-primary underline underline-offset-2;
+}
+
+kbd {
+  @apply rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px];
+}
+
 /* Block editor placeholders (contentEditable) */
 .block-placeholder:empty::before,
 .block-placeholder-focus:focus:empty::before {

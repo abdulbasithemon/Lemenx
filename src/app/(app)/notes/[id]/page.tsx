@@ -20,6 +20,7 @@ export default function NoteEditorPage() {
   const [note, setNote] = React.useState<NoteDTO | null>(null);
   const [notFound, setNotFound] = React.useState(false);
   const [noteTitles, setNoteTitles] = React.useState<Record<string, { title: string; icon?: string }>>({});
+  const [tree, setTree] = React.useState<NotesTreeData | null>(null);
   const [saveState, setSaveState] = React.useState<"saved" | "saving" | "idle">("idle");
   const [showPublish, setShowPublish] = React.useState(false);
   const [showEmoji, setShowEmoji] = React.useState(false);
@@ -36,9 +37,10 @@ export default function NoteEditorPage() {
       .catch(() => setNotFound(true));
     fetch("/api/notes-app")
       .then((r) => r.json())
-      .then((tree: NotesTreeData) => {
+      .then((t: NotesTreeData) => {
+        setTree(t);
         const map: Record<string, { title: string; icon?: string }> = {};
-        for (const n of tree.notes ?? []) map[n.id] = { title: n.title, icon: n.icon };
+        for (const n of t.notes ?? []) map[n.id] = { title: n.title, icon: n.icon };
         setNoteTitles(map);
       })
       .catch(() => {});
@@ -182,6 +184,11 @@ export default function NoteEditorPage() {
         noteTitles={noteTitles}
         onCreateSubpage={createSubpage}
         onOpenNote={(id) => router.push(`/notes/${id}`)}
+        breadcrumb={(() => {
+          const group = tree?.groups?.find((g) => g.id === note.groupId);
+          const cat = tree?.categories?.find((c) => c.id === group?.categoryId);
+          return [cat?.title, group?.title, note.title || "Untitled"].filter(Boolean).join(" / ");
+        })()}
       />
 
       {/* Publish modal */}
