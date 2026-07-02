@@ -82,7 +82,8 @@ function RowMenu({
   return (
     <div className="relative">
       <button
-        className="rounded p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover/row:opacity-100"
+        className="rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+        title="Rename / Delete"
         onClick={onToggle}
       >
         <MoreHorizontal className="h-3.5 w-3.5" />

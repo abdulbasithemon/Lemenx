@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Globe, Loader2, Share2, Smile } from "lucide-react";
+import { Globe, Loader2, Share2, Smile, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockEditor } from "@/components/notes/BlockEditor";
 import { PublishModal } from "@/components/notes/PublishModal";
@@ -141,6 +141,19 @@ export default function NoteEditorPage() {
           )}
           <Button variant="outline" size="sm" onClick={() => setShowPublish(true)}>
             <Share2 className="h-4 w-4" /> Share
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10"
+            onClick={async () => {
+              if (!confirm(`Delete note "${note.title || "Untitled"}"? This cannot be undone.`)) return;
+              await fetch(`/api/notes-app/notes/${note.id}`, { method: "DELETE" });
+              emitNotesChanged();
+              router.push("/notes");
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Delete
           </Button>
         </div>
       </div>
