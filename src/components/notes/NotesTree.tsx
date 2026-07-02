@@ -142,11 +142,25 @@ export function NotesTree() {
   /* ── API helpers ─────────────────────────────────────── */
 
   const api = async (url: string, method: string, body?: unknown) => {
-    await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const msg = await res.json().then((b) => b.error).catch(() => res.statusText);
+        alert(
+          `Couldn't save (${res.status} ${msg || ""}).\n\n` +
+          "If you just pulled new code, restart the dev server:\n" +
+          "Ctrl+C in the npm run dev terminal, then run npm run dev again."
+        );
+        return;
+      }
+    } catch {
+      alert("Network error — is the dev server running?");
+      return;
+    }
     refresh();
     emitNotesChanged();
   };
@@ -182,6 +196,10 @@ export function NotesTree() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ groupId }),
     });
+    if (!res.ok) {
+      alert("Couldn't create the note — restart the dev server and try again.");
+      return;
+    }
     const note = await res.json();
     refresh();
     emitNotesChanged();
