@@ -47,7 +47,10 @@ export function sanitizeHtml(html: string): string {
 }
 
 export function isSafeUrl(url?: string): url is string {
-  return typeof url === "string" && /^https?:\/\//i.test(url.trim());
+  if (typeof url !== "string") return false;
+  const u = url.trim();
+  // http(s) links, or files served by our own upload endpoint
+  return /^https?:\/\//i.test(u) || u.startsWith("/api/uploads/");
 }
 
 /* ── media ───────────────────────────────────────────────── */
@@ -64,8 +67,10 @@ function youtubeEmbed(url: string): string | null {
 
 function fileNameFromUrl(url: string): string {
   try {
-    const p = new URL(url).pathname;
-    return decodeURIComponent(p.split("/").filter(Boolean).pop() ?? url);
+    const p = new URL(url, "http://local").pathname;
+    const name = decodeURIComponent(p.split("/").filter(Boolean).pop() ?? url);
+    // Uploaded files are prefixed with a random id — hide it for display.
+    return name.replace(/^[0-9a-f]{8}-/, "");
   } catch {
     return url;
   }

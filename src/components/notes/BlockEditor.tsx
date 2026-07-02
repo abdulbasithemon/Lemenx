@@ -188,6 +188,14 @@ function numberFor(blocks: Block[], index: number): number {
 /*  Media & equation editor sub-components                             */
 /* ═══════════════════════════════════════════════════════════════════ */
 
+const UPLOAD_ACCEPT: Partial<Record<BlockType, string>> = {
+  image: "image/*",
+  video: "video/*",
+  audio: "audio/*",
+  pdf: "application/pdf,.pdf",
+  file: "*/*",
+};
+
 function MediaBlockEditor({
   block,
   onSetUrl,
@@ -198,33 +206,82 @@ function MediaBlockEditor({
   onRemove: () => void;
 }) {
   const [draft, setDraft] = React.useState("");
+  const [uploading, setUploading] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
   const item = SLASH_ITEMS.find((i) => i.type === block.type);
   const Icon = item?.icon ?? Paperclip;
+  const canUpload = block.type in UPLOAD_ACCEPT;
+
+  const uploadFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/notes-app/upload", { method: "POST", body: form });
+      const body = await res.json();
+      if (!res.ok) {
+        alert(body.error ?? "Upload failed");
+        return;
+      }
+      onSetUrl(body.url);
+    } catch {
+      alert("Upload failed — is the dev server running?");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (!isSafeUrl(block.url)) {
     return (
-      <div className="flex flex-1 items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-3">
-        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          autoFocus
-          className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-          placeholder={`Paste ${item?.label ?? "media"} URL (https://…) and press Enter`}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && isSafeUrl(draft)) onSetUrl(draft.trim());
-          }}
-        />
-        <button
-          className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
-          disabled={!isSafeUrl(draft)}
-          onClick={() => onSetUrl(draft.trim())}
-        >
-          Embed
-        </button>
-        <button className="rounded p-1 text-muted-foreground hover:bg-muted" onClick={onRemove} title="Remove block">
-          <X className="h-3.5 w-3.5" />
-        </button>
+      <div className="flex-1 rounded-lg border border-dashed border-border bg-muted/30 p-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            autoFocus
+            className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+            placeholder={`Paste ${item?.label ?? "media"} URL (https://…) and press Enter`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && isSafeUrl(draft)) onSetUrl(draft.trim());
+            }}
+          />
+          <button
+            className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            disabled={!isSafeUrl(draft)}
+            onClick={() => onSetUrl(draft.trim())}
+          >
+            Embed
+          </button>
+          <button className="rounded p-1 text-muted-foreground hover:bg-muted" onClick={onRemove} title="Remove block">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {canUpload && (
+          <div className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={UPLOAD_ACCEPT[block.type]}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void uploadFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              className="flex items-center gap-2 rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              {uploading ? "Uploading…" : "Upload from computer"}
+            </button>
+            <span className="text-[11px] text-muted-foreground">max 50 MB</span>
+          </div>
+        )}
       </div>
     );
   }
