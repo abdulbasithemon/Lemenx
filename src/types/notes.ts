@@ -23,7 +23,8 @@ export type BlockType =
   | "bookmark"
   | "embed"
   | "equation"
-  | "breadcrumb";
+  | "breadcrumb"
+  | "table";
 
 export interface Block {
   id: string;
@@ -35,6 +36,9 @@ export interface Block {
   indent: number;         // 0..4, replaces nested children
   linkedNoteId?: string;  // page block
   url?: string;           // media blocks: image/video/audio/file/pdf/bookmark/embed
+  split?: "none" | "cols" | "rows"; // code block layout
+  content2?: string;      // code block second pane when split
+  table?: string[][];     // table block cells (first row = header)
 }
 
 /** Top level: a subject/area, e.g. "Discrete Mathematics". */

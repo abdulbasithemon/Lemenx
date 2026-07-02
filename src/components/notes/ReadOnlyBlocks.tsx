@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown, ChevronRight, FileText, Lightbulb, List } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Code, Copy, FileText, Lightbulb, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  EquationView, MEDIA_TYPES, MediaView, sanitizeHtml, stripHtml,
+  EquationView, MEDIA_TYPES, MediaView, htmlToText, sanitizeHtml, stripHtml,
 } from "@/components/notes/blockShared";
 import type { Block } from "@/types/notes";
 
@@ -42,6 +42,44 @@ function numberFor(blocks: Block[], index: number): number {
     }
   }
   return n;
+}
+
+function ReadOnlyCode({ block, style }: { block: Block; style: React.CSSProperties }) {
+  const [copied, setCopied] = React.useState(false);
+  const split = block.split ?? "none";
+  const copy = () => {
+    navigator.clipboard.writeText(
+      htmlToText(block.content) +
+      (split !== "none" && block.content2 ? "\n\n" + htmlToText(block.content2) : "")
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  const pane = "overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed text-slate-100 whitespace-pre-wrap";
+
+  return (
+    <div style={style} className="overflow-hidden rounded-lg border border-[#233457] bg-[#0d1729]">
+      <div className="flex items-center gap-1 border-b border-[#1c2a47] bg-[#122040] px-3 py-1.5">
+        <Code className="h-3.5 w-3.5 text-slate-400" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Code</span>
+        <span className="flex-1" />
+        <button
+          className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          onClick={copy}
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+      <div className={cn(
+        split === "cols" && "grid grid-cols-2 divide-x divide-[#1c2a47]",
+        split === "rows" && "divide-y divide-[#1c2a47]"
+      )}>
+        <pre className={pane}>{htmlToText(block.content)}</pre>
+        {split !== "none" && <pre className={pane}>{htmlToText(block.content2 ?? "")}</pre>}
+      </div>
+    </div>
+  );
 }
 
 function Rich({ html, className }: { html: string; className?: string }) {
@@ -143,10 +181,30 @@ export function ReadOnlyBlocks({ blocks: rawBlocks }: { blocks: Block[] }) {
               </div>
             );
           case "code":
+            return <ReadOnlyCode key={key} block={block} style={style} />;
+          case "table":
             return (
-              <pre key={key} style={style} className="overflow-x-auto rounded-lg bg-zinc-950 px-4 py-3 font-mono text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900">
-                {stripHtml(block.content)}
-              </pre>
+              <div key={key} style={style} className="overflow-x-auto py-1">
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {(block.table ?? []).map((row, r) => (
+                      <tr key={r}>
+                        {row.map((cell, c) => (
+                          <td
+                            key={c}
+                            className={cn(
+                              "min-w-[96px] border border-border px-2.5 py-1.5 text-sm",
+                              r === 0 && "bg-muted/60 font-semibold"
+                            )}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             );
           case "equation":
             return (

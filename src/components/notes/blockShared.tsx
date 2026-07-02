@@ -12,6 +12,15 @@ export function stripHtml(html: string): string {
   return (html ?? "").replace(/<[^>]*>/g, "");
 }
 
+/** Decode HTML (entities included) back to plain text — for code copy/render. */
+export function htmlToText(html: string): string {
+  if (!html) return "";
+  if (typeof window === "undefined") return stripHtml(html);
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent ?? "";
+}
+
 /** Allowlist sanitizer for the limited inline formatting we support. */
 const ALLOWED_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "S", "STRIKE", "DEL", "CODE", "A", "BR", "SPAN", "FONT"]);
 

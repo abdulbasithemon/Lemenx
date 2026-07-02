@@ -3,13 +3,14 @@
 import * as React from "react";
 import {
   AppWindow, Bookmark, Check, CheckSquare, ChevronDown, ChevronRight, Code,
-  FileText, FileType2, GripVertical, Heading1, Heading2, Heading3, Image as ImageIcon,
-  Lightbulb, List, ListOrdered, ListTree, Milestone, Minus, Music,
-  Paperclip, Pencil, Plus, Quote, Sigma, Trash2, Type, Video, X,
+  Columns2, Copy, FileText, FileType2, GripVertical, Heading1, Heading2, Heading3,
+  Image as ImageIcon, Lightbulb, List, ListOrdered, ListTree, Milestone, Minus, Music,
+  Paperclip, Pencil, Plus, Quote, Rows2, Sigma, Square, Table as TableIcon,
+  Trash2, Type, Video, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uidClient } from "@/lib/notesClient";
-import { EquationView, MEDIA_TYPES, MediaView, isSafeUrl, stripHtml } from "@/components/notes/blockShared";
+import { EquationView, MEDIA_TYPES, MediaView, htmlToText, isSafeUrl, stripHtml } from "@/components/notes/blockShared";
 import type { Block, BlockType } from "@/types/notes";
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -47,13 +48,14 @@ const SLASH_ITEMS: Array<{
   { group: "Media", type: "bookmark", label: "Web Bookmark",      desc: "Visual link card",              keywords: "bookmark web link card url", icon: Bookmark },
   { group: "Media", type: "embed",    label: "Embed",             desc: "Embed any website (iframe)",    keywords: "embed iframe website", icon: AppWindow },
 
-  { group: "Advanced", type: "code",     label: "Code",           desc: "Monospace code snippet",        keywords: "code snippet monospace pre", icon: Code },
+  { group: "Advanced", type: "code",     label: "Code",           desc: "Snippet with copy & split view", keywords: "code snippet monospace pre", icon: Code },
   { group: "Advanced", type: "equation", label: "Equation",       desc: "LaTeX math (KaTeX)",            keywords: "equation math tex latex formula", icon: Sigma },
+  { group: "Advanced", type: "table",    label: "Table",          desc: "Editable grid — add rows/cols anytime", keywords: "table grid cells rows columns", icon: TableIcon },
 ];
 
 const LIST_TYPES: BlockType[] = ["todo", "bulleted", "numbered"];
 /** Blocks with no editable text — Backspace on the block below removes them. */
-const VOID_TYPES = new Set<BlockType>(["divider", "toc", "page", "breadcrumb", "equation", ...MEDIA_TYPES]);
+const VOID_TYPES = new Set<BlockType>(["divider", "toc", "page", "breadcrumb", "equation", "table", ...MEDIA_TYPES]);
 const MAX_INDENT = 4;
 const INDENT_PX = 24;
 
@@ -371,6 +373,256 @@ function EquationBlockEditor({
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
+/*  Code block: bluish theme, copy button, split view                  */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+function CodeBlockEditor({
+  block,
+  refCb,
+  common,
+  onPatch,
+}: {
+  block: Block;
+  refCb: (el: HTMLDivElement | null) => void;
+  common: {
+    value: string;
+    onInput: (html: string) => void;
+    onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  };
+  onPatch: (patch: Partial<Block>) => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const split = block.split ?? "none";
+
+  const copy = () => {
+    const text =
+      htmlToText(block.content) +
+      (split !== "none" && block.content2 ? "\n\n" + htmlToText(block.content2) : "");
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  /** Second pane handles its own keys: Enter = newline, Tab = 2 spaces. */
+  const pane2Keys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.execCommand("insertText", false, "\n");
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      document.execCommand("insertText", false, "  ");
+    }
+  };
+
+  const splitBtn = (mode: "none" | "cols" | "rows", Icon: React.ComponentType<{ className?: string }>, title: string) => (
+    <button
+      className={cn(
+        "rounded p-1 transition-colors",
+        split === mode ? "bg-white/15 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
+      )}
+      title={title}
+      onClick={() => onPatch({ split: mode })}
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
+
+  const paneClass = "px-4 py-3 font-mono text-[13px] leading-relaxed text-slate-100";
+
+  return (
+    <div className="flex-1 overflow-hidden rounded-lg border border-[#233457] bg-[#0d1729]">
+      {/* Header bar */}
+      <div className="flex items-center gap-1 border-b border-[#1c2a47] bg-[#122040] px-3 py-1.5">
+        <Code className="h-3.5 w-3.5 text-slate-400" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Code</span>
+        <span className="flex-1" />
+        {splitBtn("none", Square, "Single pane")}
+        {splitBtn("cols", Columns2, "Split into 2 columns")}
+        {splitBtn("rows", Rows2, "Split into 2 rows")}
+        <span className="mx-1 h-4 w-px bg-white/10" />
+        <button
+          className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          onClick={copy}
+          title="Copy code"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+
+      {/* Panes */}
+      <div
+        className={cn(
+          split === "cols" && "grid grid-cols-2 divide-x divide-[#1c2a47]",
+          split === "rows" && "divide-y divide-[#1c2a47]"
+        )}
+      >
+        <EditableText
+          ref={refCb}
+          {...common}
+          placeholder="Write some code…"
+          className={paneClass}
+        />
+        {split !== "none" && (
+          <EditableText
+            value={block.content2 ?? ""}
+            placeholder="Second pane…"
+            className={paneClass}
+            onInput={(html) => onPatch({ content2: html })}
+            onKeyDown={pane2Keys}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  Table block: pick size, then fully editable with row/col controls  */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+function TableBlockEditor({
+  block,
+  onPatch,
+  onRemove,
+}: {
+  block: Block;
+  onPatch: (patch: Partial<Block>) => void;
+  onRemove: () => void;
+}) {
+  const [rows, setRows] = React.useState(3);
+  const [cols, setCols] = React.useState(3);
+  const table = block.table;
+
+  /* Size picker before the grid exists */
+  if (!table) {
+    const clamp = (n: number) => Math.max(1, Math.min(20, n || 1));
+    return (
+      <div className="flex flex-1 flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-4">
+        <TableIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          Rows
+          <input
+            type="number" min={1} max={20} value={rows}
+            className="w-16 rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            onChange={(e) => setRows(clamp(Number(e.target.value)))}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          Columns
+          <input
+            type="number" min={1} max={20} value={cols}
+            className="w-16 rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            onChange={(e) => setCols(clamp(Number(e.target.value)))}
+          />
+        </label>
+        <button
+          className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+          onClick={() => onPatch({ table: Array.from({ length: rows }, () => Array(cols).fill("")) })}
+        >
+          Create table
+        </button>
+        <button className="rounded p-1 text-muted-foreground hover:bg-muted" onClick={onRemove} title="Remove block">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  const nRows = table.length;
+  const nCols = table[0]?.length ?? 0;
+  const setTable = (t: string[][]) => onPatch({ table: t });
+  const setCell = (r: number, c: number, v: string) =>
+    setTable(table.map((row, ri) => (ri === r ? row.map((cell, ci) => (ci === c ? v : cell)) : row)));
+  const addRow = () => setTable([...table, Array(nCols).fill("")]);
+  const addCol = () => setTable(table.map((row) => [...row, ""]));
+  const delRow = (r: number) => nRows > 1 && setTable(table.filter((_, i) => i !== r));
+  const delCol = (c: number) => nCols > 1 && setTable(table.map((row) => row.filter((_, i) => i !== c)));
+
+  return (
+    <div className="group/tbl flex-1">
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          {/* Column delete strip (appears on hover) */}
+          <div
+            className="grid h-5 opacity-0 transition-opacity group-hover/tbl:opacity-100"
+            style={{ gridTemplateColumns: `repeat(${nCols}, minmax(96px, 1fr))` }}
+          >
+            {Array.from({ length: nCols }).map((_, c) => (
+              <button
+                key={c}
+                className="mx-auto flex h-4 w-4 items-center justify-center rounded text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive disabled:invisible"
+                title="Delete column"
+                disabled={nCols <= 1}
+                onClick={() => delCol(c)}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+          </div>
+
+          <table className="w-full border-collapse">
+            <tbody>
+              {table.map((row, r) => (
+                <tr key={r} className="group/row">
+                  {row.map((cell, c) => (
+                    <td
+                      key={c}
+                      className={cn(
+                        "relative min-w-[96px] border border-border p-0",
+                        r === 0 && "bg-muted/60"
+                      )}
+                    >
+                      <input
+                        className={cn(
+                          "w-full bg-transparent px-2.5 py-1.5 text-sm focus:bg-primary/5 focus:outline-none",
+                          r === 0 && "font-semibold"
+                        )}
+                        placeholder={r === 0 ? "Header" : ""}
+                        value={cell}
+                        onChange={(e) => setCell(r, c, e.target.value)}
+                      />
+                      {/* Row delete — on the first cell, visible on row hover */}
+                      {c === 0 && nRows > 1 && (
+                        <button
+                          className="absolute -left-5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded text-muted-foreground/60 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/row:opacity-100"
+                          title="Delete row"
+                          onClick={() => delRow(r)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Add row */}
+          <button
+            className="mt-1 flex w-full items-center justify-center gap-1 rounded border border-dashed border-border py-1 text-xs text-muted-foreground/60 opacity-0 transition-opacity hover:bg-muted/50 hover:text-muted-foreground group-hover/tbl:opacity-100"
+            onClick={addRow}
+          >
+            <Plus className="h-3 w-3" /> Row
+          </button>
+        </div>
+
+        {/* Add column */}
+        <button
+          className="mt-5 flex items-center justify-center gap-1 self-stretch rounded border border-dashed border-border px-1 text-xs text-muted-foreground/60 opacity-0 transition-opacity hover:bg-muted/50 hover:text-muted-foreground group-hover/tbl:opacity-100"
+          title="Add column"
+          onClick={addCol}
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
 /*  BlockEditor                                                        */
 /* ═══════════════════════════════════════════════════════════════════ */
 
@@ -455,7 +707,7 @@ export function BlockEditor({
 
     const content =
       item.type === "breadcrumb" ? (breadcrumb ?? "")
-      : ["divider", "toc", "equation", ...MEDIA_TYPES].includes(item.type) ? ""
+      : ["divider", "toc", "equation", "table", ...MEDIA_TYPES].includes(item.type) ? ""
       : stripped;
 
     if (!VOID_TYPES.has(item.type) && item.type !== "code") {
@@ -781,12 +1033,21 @@ export function BlockEditor({
               break;
             case "code":
               body = (
-                <div className="flex-1 rounded-lg bg-zinc-950 px-4 py-3 dark:bg-zinc-900">
-                  <EditableText
-                    ref={refCb} {...common} placeholder="Write some code…"
-                    className="font-mono text-[13px] leading-relaxed text-zinc-100"
-                  />
-                </div>
+                <CodeBlockEditor
+                  block={block}
+                  refCb={refCb}
+                  common={common}
+                  onPatch={(patch) => patchBlock(block.id, patch)}
+                />
+              );
+              break;
+            case "table":
+              body = (
+                <TableBlockEditor
+                  block={block}
+                  onPatch={(patch) => patchBlock(block.id, patch)}
+                  onRemove={() => removeBlock(block.id)}
+                />
               );
               break;
             case "equation":
