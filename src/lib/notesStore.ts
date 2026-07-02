@@ -61,7 +61,14 @@ function seed(): NotesDB {
 function load(): NotesDB {
   try {
     const raw = fs.readFileSync(DB_PATH, "utf8");
-    return JSON.parse(raw) as NotesDB;
+    const db = JSON.parse(raw) as NotesDB;
+    // Heal notes saved by an earlier bug that could drop the blocks array.
+    for (const n of db.notes) {
+      if (!Array.isArray(n.blocks) || n.blocks.length === 0) {
+        n.blocks = [{ id: uid(), type: "text", content: "", indent: 0 }];
+      }
+    }
+    return db;
   } catch {
     const db = seed();
     persist(db);
@@ -169,7 +176,12 @@ export function updateNote(
   const db = load();
   const n = db.notes.find((n) => n.id === id);
   if (!n) return undefined;
-  Object.assign(n, patch, { updatedAt: new Date().toISOString() });
+  // Drop undefined keys — a partial save (e.g. title only) must never
+  // clobber fields it didn't include (was wiping blocks to undefined).
+  const clean = Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined)
+  );
+  Object.assign(n, clean, { updatedAt: new Date().toISOString() });
   persist(db);
   return n;
 }

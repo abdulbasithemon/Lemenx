@@ -42,7 +42,8 @@ function numberFor(blocks: Block[], index: number): number {
   return n;
 }
 
-export function ReadOnlyBlocks({ blocks }: { blocks: Block[] }) {
+export function ReadOnlyBlocks({ blocks: rawBlocks }: { blocks: Block[] }) {
+  const blocks = Array.isArray(rawBlocks) ? rawBlocks : [];
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const shown = visibleBlocks(blocks, collapsed);
   const headings = blocks.filter((b) => ["h1", "h2", "h3"].includes(b.type) && b.content.trim());
@@ -120,6 +121,12 @@ export function ReadOnlyBlocks({ blocks }: { blocks: Block[] }) {
                 <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                 <span className="text-[15px] leading-relaxed">{block.content}</span>
               </div>
+            );
+          case "code":
+            return (
+              <pre key={key} style={style} className="overflow-x-auto rounded-lg bg-zinc-950 px-4 py-3 font-mono text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900">
+                {block.content}
+              </pre>
             );
           case "toc":
             return (

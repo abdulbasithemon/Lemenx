@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  Check, CheckSquare, ChevronDown, ChevronRight, FileText, GripVertical,
+  Check, CheckSquare, ChevronDown, ChevronRight, Code, FileText, GripVertical,
   Heading1, Heading2, Heading3, Lightbulb, List, ListOrdered, ListTree,
   Minus, Plus, Quote, Type,
 } from "lucide-react";
@@ -32,6 +32,7 @@ const SLASH_ITEMS: Array<{
   { type: "quote",    label: "Quote",             desc: "Capture a quotation",          keywords: "quote blockquote cite", icon: Quote },
   { type: "divider",  label: "Divider",           desc: "Horizontal line",              keywords: "divider hr line separator", icon: Minus },
   { type: "callout",  label: "Callout",           desc: "Highlighted note box",         keywords: "callout highlight info tip", icon: Lightbulb },
+  { type: "code",     label: "Code",              desc: "Monospace code snippet",       keywords: "code snippet monospace pre", icon: Code },
   { type: "toc",      label: "Table of Contents", desc: "Links to headings in this note", keywords: "toc table contents outline", icon: ListTree },
   { type: "page",     label: "Page",              desc: "Nested sub-page link",         keywords: "page subpage nested link", icon: FileText },
 ];
@@ -173,7 +174,12 @@ interface SlashState {
   index: number;
 }
 
-export function BlockEditor({ blocks, onChange, noteTitles, onCreateSubpage, onOpenNote }: BlockEditorProps) {
+export function BlockEditor({ blocks: rawBlocks, onChange, noteTitles, onCreateSubpage, onOpenNote }: BlockEditorProps) {
+  // Never crash on malformed data — treat missing blocks as an empty note.
+  const blocks = React.useMemo(
+    () => (Array.isArray(rawBlocks) ? rawBlocks : []),
+    [rawBlocks]
+  );
   const refs = React.useRef<Record<string, HTMLDivElement | null>>({});
   const pendingFocus = React.useRef<{ id: string; offset: number | "end" } | null>(null);
   const [slash, setSlash] = React.useState<SlashState | null>(null);
@@ -277,6 +283,19 @@ export function BlockEditor({ blocks, onChange, noteTitles, onCreateSubpage, onO
     if (e.key === "/" && !slash) {
       setSlash({ blockId: block.id, anchor: getCaretOffset(el), query: "", index: 0 });
       return; // let the "/" character be typed
+    }
+
+    // Inside a code block, Enter inserts a newline; Shift+Enter exits below.
+    if (e.key === "Enter" && block.type === "code") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        const nb = newBlock("text", block.indent);
+        pendingFocus.current = { id: nb.id, offset: 0 };
+        insertAfter(block.id, nb);
+      } else {
+        document.execCommand("insertText", false, "\n");
+      }
+      return;
     }
 
     if (e.key === "Enter" && !e.shiftKey) {
@@ -509,6 +528,16 @@ export function BlockEditor({ blocks, onChange, noteTitles, onCreateSubpage, onO
               <div className="flex flex-1 items-start gap-3 rounded-lg bg-muted p-4">
                 <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                 <EditableText ref={refCb} {...common} placeholder="Callout" className="text-[15px]" />
+              </div>
+            );
+            break;
+          case "code":
+            body = (
+              <div className="flex-1 rounded-lg bg-zinc-950 px-4 py-3 dark:bg-zinc-900">
+                <EditableText
+                  ref={refCb} {...common} placeholder="Write some code…"
+                  className="font-mono text-[13px] leading-relaxed text-zinc-100"
+                />
               </div>
             );
             break;

@@ -12,6 +12,7 @@ export type BlockType =
   | "quote"
   | "divider"
   | "callout"
+  | "code"
   | "toc"
   | "page";
 
