@@ -1,0 +1,168 @@
+// Prisma schema — SQLite by default for zero-config local use.
+// To use MySQL/PostgreSQL: change provider below and DATABASE_URL in .env,
+// then run `npx prisma db push`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Roles: super_admin | manager | agent
+// User status: active | paused
+model User {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  dob            String // YYYY-MM-DD, second security factor at login
+  passwordHash   String
+  role           String
+  status         String   @default("active")
+  whatsappNumber String?
+  createdById    Int?
+  createdAt      DateTime @default(now())
+
+  sessions      Session[]
+  menuStates    MenuState[]
+  leaves        LeaveApplication[] @relation("applicant")
+  decidedLeaves LeaveApplication[] @relation("approver")
+  notifications Notification[]
+}
+
+// Category: elite_special | call_sheet
+// Status: "fresh" until first touched, then any label from Status table.
+model Lead {
+  id            Int       @id @default(autoincrement())
+  customerName  String
+  phone         String
+  address       String?
+  totalOrders   Int       @default(0)
+  delivered     Int       @default(0)
+  returned      Int       @default(0)
+  category      String
+  status        String    @default("fresh")
+  assignedToId  Int?
+  touchedAt     DateTime?
+  touchedById   Int?
+  agentNote     String?
+  uploadedById  Int
+  uploadBatchId String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  statusHistory LeadStatusHistory[]
+  reuploadLogs  LeadReuploadLog[]
+
+  @@index([category, status, assignedToId])
+  @@index([phone, category])
+}
+
+model LeadStatusHistory {
+  id          Int      @id @default(autoincrement())
+  leadId      Int
+  oldStatus   String
+  newStatus   String
+  changedById Int
+  changedAt   DateTime @default(now())
+  note        String?
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([changedAt])
+}
+
+model LeadReuploadLog {
+  id                Int      @id @default(autoincrement())
+  leadId            Int
+  previousStatus    String
+  previousTouchedBy Int?
+  reuploadedById    Int
+  reuploadedAt      DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Status {
+  id        Int     @id @default(autoincrement())
+  label     String  @unique
+  color     String  @default("#64748b")
+  createdBy Int?
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+}
+
+// Leave status: pending | approved | declined
+model LeaveApplication {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  leaveDate    String // YYYY-MM-DD
+  reason       String
+  status       String    @default("pending")
+  decidedById  Int?
+  decisionNote String?
+  decidedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user      User  @relation("applicant", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("approver", fields: [decidedById], references: [id])
+
+  @@index([userId, leaveDate])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model WhatsappLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  phoneNumber String
+  message     String
+  status      String // sent | failed
+  apiResponse String?
+  createdAt   DateTime @default(now())
+}
+
+// One row per login; used to count "currently logged-in users" for
+// the fair lead-distribution split.
+model Session {
+  id           String   @id
+  userId       Int
+  isActive     Boolean  @default(true)
+  lastActivity DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, lastActivity])
+}
+
+// Per-user, per-category rolling-window state (the 10 -> 11 rule).
+// visibleIds: JSON array of lead ids in display order.
+// touchedQueue: JSON array of visible lead ids in first-touch order (not yet hidden).
+// newTouches: first-touches since the last roll; at 8 the window rolls.
+model MenuState {
+  id           Int    @id @default(autoincrement())
+  userId       Int
+  category     String
+  sessionId    String
+  visibleIds   String @default("[]")
+  touchedQueue String @default("[]")
+  newTouches   Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+}
